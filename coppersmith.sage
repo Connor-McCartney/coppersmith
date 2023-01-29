@@ -85,7 +85,7 @@ def solve_system_jacobian(h, f, bounds, iters=200, prec=1000):
             return v
     return None
 
-def solve_system_gb(H, f, timeout=1):
+def solve_system_gb(H, f, timeout=2):
     vs = list(f.variables())
     H_ = PolynomialSequence([], H[0].parent().change_ring(QQ))
     for h in tqdm(H):
@@ -95,15 +95,13 @@ def solve_system_gb(H, f, timeout=1):
 
         alarm(timeout)
         try:
-            gb_solve = I.variety(ring=ZZ)
+            for root in I.variety(ring=ZZ):
+                root = tuple(H[0].parent().base_ring()(root[var]) for var in vs)
+                roots.append(root)
+            cancel_alarm()
+            return roots
         except:
-            continue
-        cancel_alarm()
-
-        for root in gb_solve:
-            root = tuple(H[0].parent().base_ring()(root[var]) for var in vs)
-            roots.append(root)
-        return roots
+            cancel_alarm()       
 
 class IIter:
     def __init__(self, m, n):
