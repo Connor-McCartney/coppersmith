@@ -231,7 +231,7 @@ def multivariate_shift_polynomials(f, bounds, m=1, d=None):
     return f, H
 
 def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None):
-    elif implementation == "herrmann_may":
+    if implementation == "herrmann_may":
         f, h = multivariate_herrmann_may(f, bounds, m, t)
     elif implementation == "shift_polynomials":
         f, h = multivariate_shift_polynomials(f, bounds, m, d)
@@ -247,27 +247,9 @@ def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None):
         print("invalid algorithm")
         return None
 
-def demo_1():
-    N = 0xc20d4f0792f162e3f3486f47c2c5b05696ba5c81ec09f5386bf741b7289b85e2d744559825a23b0ae094da214f3158344e5d5ba86fb1ecd1f40c8682a7bee55021eba772e23793001a38b9cccbfdc1d9316cccc3b79acd045c512b44e0f3697383958113a280791e17c23fe80fa38099e4907f70f4d228285aac69ed2d3bcf99
-    _p = "fe8984407b0816cc28e5ccc6bb7379??????????ca3806dd2cfdfc8d616b????????6109a4dbe3876b8d1b8adc9175dfba0e1ef318801648d6??????????a05b"
-    f, bounds = generate_polynomial(N, _p)
-    print(coppersmith(f, bounds, implementation="herrmann_may", algorithm="groebner", m=6, t=1))
-
-def demo_2():
-    e = 0x010001
-    n = 0x00c0d76392ed01ca0729a8a0aaecbf09ee5814806fb7d0cb4fe97c81a6b48b6fd86eefdeebc71a33305f4b64c5b55b342a9dbc09ba081a2a0293e6e3b09f3f290a8c8f1c08aa28a3c830c58bc5ff97b2dc7b309e576673180ec0f8273099bc9ff84e477ade15279ca2fbc7e2df3e59dd7705e2339ca306141487a7454b6d3e7188dea6530bfee5892c0583c6132c613c0c5c1ed7f0d1a97d306fa666964bf50e11d10b3fe7d54574b815532d763979b6f5625d9823fb7c2186727197ef158bce3e3575267a79baa1819ed1d2de595ebf9ffb909b8df2a8e9efbe73f490a0cd35a4d8f02a7bd3dd5652c9d6902e75e1e9bf75df3a7da23bd7e97350b71546868161d6ab486c610471b80334745c03dac178266b32aff70fd62799f1e8da324db32fbf5b502ee45f9ff263d55f0498cfbc50b77cab263447cfcded4b5cd2ed6302276b6b69b30a4d44232c95dd2f1ae5e993577a591958b4c61ef1a9755d3641b470c127108f0a9fbe715bbc3082fe260afbeb578c229ce511a096ee492955378907
-    u = 0x67a20eff99da8fd3a85d2ea87d2ff339bde448035e19cb042693608c7e630aa4a71a7c6f66b692a2c1c57169943f90947ff29fcfc3ae1bce6edf1d09600b73a952b2b34fa3d26e2a9adb84df29dda24e982de676e468a50d273c4de535bf8a11503889f339d9428fdee8f07ca7dd89768ab0ee6a72e3829514d0df9d1330be467b7999369d6699b16945a87787ea540fbc828280a23de75e573d0a6d4fb10d526b71e3a55e7b41db39d0bf773609eeaa7cc018e279aca93125c23107568e687e
-    q_middle = 0xc570613da06c478
-    q_lower = 0x691738dc8996d
-    q_upper = 0xc597ff4fc78fabff87fd021ee21d02e2b2f726cbe12
-    PR.<x0,x1> = PolynomialRing(Zmod(n), 2)
-    qq = q_upper*2^(4*341) + q_middle*2^(4*116) + q_lower + 2^52*x0 + 2**524*x1
-    f = u*qq**2 - qq
-    print(coppersmith(f, bounds=(2^412, 2^840), implementation="shift_polynomials", algorithm="groebner", m=3, d=2))
 
 def main():
-    pass
-    #demo_1()
+    demo_1()
     demo_2()
 
 if __name__ == "__main__":
