@@ -8,9 +8,10 @@ https://eprint.iacr.org/2023/032.pdf
 """
 
 from sage.rings.polynomial.multi_polynomial_sequence import PolynomialSequence
+from Crypto.Util.number import getPrime
+from tqdm import tqdm
 import cysignals
 import itertools
-from tqdm import tqdm
 
 def generate_polynomial(N, _p):
     coefficients = []
@@ -48,7 +49,7 @@ def univariate(f, X, beta=1.0, m=None):
         epsilon = RR(beta^2/f.degree() - log(2*X, N))
         m = max(beta**2/(delta * epsilon), 7*beta/delta).ceil()
     t = int((delta*m*(1/beta - 1)).floor())
-    print(f"m = {m}")
+    #print(f"m = {m}")
     
     f = f.monic().change_ring(ZZ)
     P,(x,) = f.parent().objgens()
@@ -245,10 +246,124 @@ def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None):
         print("invalid algorithm")
         return None
 
+def recover_p_high(p_high, n):
+    p_bits = (len(bin(n))-2)//2
+    p_high_bits = len(bin(p_high)) - 2
+    PR.<x> = PolynomialRing(Zmod(n))
+    f = p_high * 2**(p_bits-p_high_bits) + x
+    x = univariate(f, X=2**(p_bits-p_high_bits), beta=0.4)
+    if x == []:
+        return None
+    p = int(f(x[0]))
+    if is_prime(p):
+        return p
+    return None
+
+def recover_p_low(p_low, n):
+    p_bits = (len(bin(n))-2)//2
+    p_low_bits = len(bin(p_low)) - 2
+    PR.<x> = PolynomialRing(Zmod(n))
+    f = x * 2**p_low_bits + p_low
+    x = univariate(f, X=2**(p_bits-p_low_bits), beta=0.4)
+    if x == []:
+        return None
+    p = int(f(x[0]))
+    if is_prime(p):
+        return p
+    return None
+
+def demo_1():
+    p = getPrime(512)
+    q = getPrime(512)
+    n = p*q
+    p_high = int(hex(p)[:100], 16)
+    print("\ndemo 1 - p_high")
+    if recover_p_high(p_high, n) is not None:
+        print("PASS")
+    else:
+        print("FAIL")
+
+def demo_2():
+    p = getPrime(512)
+    q = getPrime(512)
+    n = p*q
+    p_low = int(hex(p)[-100:], 16) 
+    print("\ndemo 2 - p_low")
+    if recover_p_low(p_low, n) is not None:
+        print("PASS")
+    else:
+        print("FAIL")
+
+def demo_3():
+    # not 100% successful and very slow unless e is small
+    def recover_d_low(d_low, n, e):
+        t = len(bin(d_low)) - 2
+        for k in tqdm(range(1, e)):
+            x = var('x')
+            for r in solve_mod([x*e*d_low == x + k*(n*x - x**2 - n + x)], 2**t):
+                p_low = int(r[0])
+                try:
+                    p = recover_p_low(p_low, n)
+                    if p is not None and is_prime(p):
+                        return p
+                except:
+                    continue
+
+    while True:
+        p = getPrime(256)
+        q = getPrime(256)
+        e = 11
+        n = p*q
+        try:
+            d = int(pow(e, -1, (p-1)*(q-1)))
+            break
+        except ZeroDivisionError:
+            continue
+
+    d_low = int(hex(d)[80:], 16)
+    print("\ndemo 3 - d_low")
+    if recover_d_low(d_low, n, e) is not None:
+        print("PASS")
+    else:
+        print("FAIL")
+
+def demo_4():
+    def recover_dp_high(dp_high, n, e):
+        beta = 0.4
+        upper_bound = int(2*n**(beta**2))
+        dp_bits_max = (len(bin(n))-2)//2
+        for dp_bits in range(dp_bits_max + 1, dp_bits_max - 20, -1):
+            _dp = int(dp_high * 2**(dp_bits - (len(bin(dp_high))-2)))
+            for xi in range(-upper_bound + upper_bound//8, upper_bound, upper_bound//4):
+                P.<x> = PolynomialRing(Zmod(n))
+                f = _dp*e + x - xi
+                x = f.small_roots(X=upper_bound, beta=beta)
+                if x == []:
+                    continue
+                kp = int(f(x[0]))
+                p = gcd(n, kp)
+                if 1 < p < n and is_prime(p):
+                    return p
+
+    p = getPrime(512)
+    q = getPrime(512)
+    n = p*q
+    e = 65537
+    d = pow(e, -1, (p-1)*(q-1))
+    dp = int(d % (p-1))
+    dp_high = int(hex(dp)[:100], 16)
+    print("\ndemo 4 - dp_high")
+    if recover_dp_high(dp_high, n, e) is not None:
+        print("PASS")
+    else:
+        print("FAIL")
+
 
 def main():
     demo_1()
     demo_2()
+    demo_3()
+    demo_4()
 
 if __name__ == "__main__":
     main()
