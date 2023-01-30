@@ -72,11 +72,11 @@ def solve_system_jacobian(h, f, bounds, iters=200, prec=1000):
     n = f.nvariables()
     x = f.parent().objgens()[1]
     x_ = [var(f'x{i}') for i in range(n)]
-    for ii in Combinations(range(len(h)), k=n):
+    for ii in tqdm(Combinations(range(len(h)), k=n)):
         f = symbolic_expression([h[i](x) for i in ii]).function(x_)
         jac = jacobian(f, x_)
         v = vector([t // 2 for t in bounds])
-        for _ in tqdm(range(iters)):
+        for _ in range(iters):
             kwargs = {'x{}'.format(i): v[i] for i in range(n)}
             try:
                 tmp = v - jac(**kwargs).inverse() * f(**kwargs)
@@ -88,7 +88,7 @@ def solve_system_jacobian(h, f, bounds, iters=200, prec=1000):
             return v
     return None
 
-def solve_system_gb(H, f, timeout=2):
+def solve_system_gb(H, f, timeout=5):
     vs = list(f.variables())
     H_ = PolynomialSequence([], H[0].parent().change_ring(QQ))
     for h in tqdm(H):
@@ -102,7 +102,8 @@ def solve_system_gb(H, f, timeout=2):
                 root = tuple(H[0].parent().base_ring()(root[var]) for var in vs)
                 roots.append(root)
             cancel_alarm()
-            return roots
+            if roots != []:
+                return roots
         except:
             cancel_alarm()       
 
@@ -184,7 +185,7 @@ def multivariate_herrmann_may(f, bounds, m, t):
    
     return f, h
 
-def multivariate_shift_polynomials(f, bounds, m=1, d=None):
+def multivariate_shift_polynomials(f, bounds, m, d):
     if d is None:
         d = f.degree()
 
@@ -360,12 +361,47 @@ def demo_4():
     else:
         print("FAIL")
 
+def demo_5():
+    n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
+    p = 0xa2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257
+    _p = "?????????????????????????????????????????????????????????????????????????????????????1895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257"
+    f, bounds = generate_polynomial(n, _p)
+    print("\ndemo 5: one chunk")
+    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
+    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
+    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
+    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
+
+def demo_6():
+    n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
+    p = 0xa2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257
+    _p = "a2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c7017009749?????????????????????????????????????????????????????????????????????????????????????"
+    f, bounds = generate_polynomial(n, _p)
+    print("\ndemo 6: one chunk")
+    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
+    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
+    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
+    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
+
+def demo_8():
+    n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
+    p = 0xa2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257
+    _p = "a2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd????????????????????????????????????86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f6?????????????????????????????"
+    f, bounds = generate_polynomial(n, _p)
+    print("\ndemo 8: two chunks")
+    #print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=5))
+    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5))
+    #print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=2, d=4))
+    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=2, d=4))
 
 def main():
     demo_1()
     demo_2()
     demo_3()
     demo_4()
+    demo_5()
+    demo_6()
+    demo_8()
 
 if __name__ == "__main__":
     main()
