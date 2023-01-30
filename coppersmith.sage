@@ -33,6 +33,8 @@ def generate_polynomial(N, _p):
 
     if is_current_unknown:
         bounds.append(2^(4*i))
+
+    if _p[-1] == '?':
         coefficients = coefficients[::-1]
         coefficients.append(1)
 
