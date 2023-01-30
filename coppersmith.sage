@@ -279,7 +279,7 @@ def demo_1():
     q = getPrime(512)
     n = p*q
     p_high = int(hex(p)[:100], 16)
-    print("\ndemo 1 - p_high")
+    print("\ndemo 1: p_high")
     if recover_p_high(p_high, n) is not None:
         print("PASS")
     else:
@@ -290,7 +290,7 @@ def demo_2():
     q = getPrime(512)
     n = p*q
     p_low = int(hex(p)[-100:], 16) 
-    print("\ndemo 2 - p_low")
+    print("\ndemo 2: p_low")
     if recover_p_low(p_low, n) is not None:
         print("PASS")
     else:
@@ -323,7 +323,7 @@ def demo_3():
             continue
 
     d_low = int(hex(d)[80:], 16)
-    print("\ndemo 3 - d_low")
+    print("\ndemo 3: d_low")
     if recover_d_low(d_low, n, e) is not None:
         print("PASS")
     else:
@@ -354,7 +354,7 @@ def demo_4():
     d = pow(e, -1, (p-1)*(q-1))
     dp = int(d % (p-1))
     dp_high = int(hex(dp)[:100], 16)
-    print("\ndemo 4 - dp_high")
+    print("\ndemo 4: dp_high")
     if recover_dp_high(dp_high, n, e) is not None:
         print("PASS")
     else:
