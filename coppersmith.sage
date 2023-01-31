@@ -413,6 +413,14 @@ def demo_9():
     print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
     print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=4))
 
+def demo_10():
+    n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
+    p = 0xa2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257
+    _p = "????????????????7bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0????????????????e047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e????????????????"
+    f, bounds = generate_polynomial(n, _p)
+    print("\ndemo 10: three chunks")
+    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5))
+
 def main():
     demo_1()
     demo_2()
@@ -423,6 +431,7 @@ def main():
     demo_7()
     demo_8()
     demo_9()
+    demo_10()
 
 if __name__ == "__main__":
     main()
