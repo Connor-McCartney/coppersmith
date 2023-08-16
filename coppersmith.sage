@@ -4,6 +4,7 @@ References:
 https://www.iacr.org/archive/asiacrypt2008/53500412/53500412.pdf
 https://gist.github.com/hyunsikjeong/0c26e83bb37866f5c7c6b8918a854333
 https://github.com/josephsurin/lattice-based-cryptanalysis/blob/main/lbc_toolkit/problems/small_roots.sage
+https://github.com/kionactf/coppersmith
 https://eprint.iacr.org/2023/032.pdf
 """
 
