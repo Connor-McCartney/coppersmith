@@ -250,8 +250,7 @@ def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None):
         print("invalid algorithm")
         return None
 
-def recover_p_high(p_high, n):
-    p_bits = (len(bin(n))-2)//2
+def recover_p_high(p_high, n, p_bits):
     p_high_bits = len(bin(p_high)) - 2
     PR.<x> = PolynomialRing(Zmod(n))
     f = p_high * 2**(p_bits-p_high_bits) + x
@@ -263,8 +262,7 @@ def recover_p_high(p_high, n):
         return p
     return None
 
-def recover_p_low(p_low, n):
-    p_bits = (len(bin(n))-2)//2
+def recover_p_low(p_low, n, p_bits):
     p_low_bits = len(bin(p_low)) - 2
     PR.<x> = PolynomialRing(Zmod(n))
     f = x * 2**p_low_bits + p_low
@@ -282,7 +280,7 @@ def demo_1():
     n = p*q
     p_high = int(hex(p)[:100], 16)
     print("\ndemo 1: p_high")
-    if recover_p_high(p_high, n) is not None:
+    if recover_p_high(p_high, n, 512) is not None:
         print("PASS")
     else:
         print("FAIL")
@@ -293,21 +291,21 @@ def demo_2():
     n = p*q
     p_low = int(hex(p)[-100:], 16) 
     print("\ndemo 2: p_low")
-    if recover_p_low(p_low, n) is not None:
+    if recover_p_low(p_low, n, 512) is not None:
         print("PASS")
     else:
         print("FAIL")
 
 def demo_3():
     # not 100% successful and very slow unless e is small
-    def recover_d_low(d_low, n, e):
+    def recover_d_low(d_low, n, e, p_bits):
         t = len(bin(d_low)) - 2
         for k in tqdm(range(1, e)):
             x = var('x')
             for r in solve_mod([x*e*d_low == x + k*(n*x - x**2 - n + x)], 2**t):
                 p_low = int(r[0])
                 try:
-                    p = recover_p_low(p_low, n)
+                    p = recover_p_low(p_low, n, p_bits)
                     if p is not None and is_prime(p):
                         return p
                 except:
@@ -326,7 +324,7 @@ def demo_3():
 
     d_low = int(hex(d)[80:], 16)
     print("\ndemo 3: d_low")
-    if recover_d_low(d_low, n, e) is not None:
+    if recover_d_low(d_low, n, e, 256) is not None:
         print("PASS")
     else:
         print("FAIL")
