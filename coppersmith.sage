@@ -297,7 +297,6 @@ def demo_2():
         print("FAIL")
 
 def demo_3():
-    # not 100% successful and very slow unless e is small
     def recover_d_low(d_low, n, e, p_bits):
         t = len(bin(d_low)) - 2
         for k in tqdm(range(1, e)):
