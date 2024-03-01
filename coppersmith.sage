@@ -69,25 +69,61 @@ def univariate(f, X, beta=1.0, m=None):
     roots = set([f.base_ring()(r) for r,m in f.roots() if abs(r) <= X])
     return [root for root in roots if N.gcd(ZZ(f(root))) >= N**beta]
 
-def solve_system_jacobian(h, f, bounds, iters=200, prec=1000):
-    n = f.nvariables()
-    x = f.parent().objgens()[1]
-    x_ = [var(f'x{i}') for i in range(n)]
-    for ii in tqdm(Combinations(range(len(h)), k=n)):
-        f = symbolic_expression([h[i](x) for i in ii]).function(x_)
-        jac = jacobian(f, x_)
-        v = vector([t // 2 for t in bounds])
-        for _ in range(iters):
-            kwargs = {'x{}'.format(i): v[i] for i in range(n)}
-            try:
-                tmp = v - jac(**kwargs).inverse() * f(**kwargs)
-            except ZeroDivisionError:
-                return None
-            v = vector((numerical_approx(d, prec=prec) for d in tmp))
-        v = [int(_.round()) for _ in v]
-        if h[0](v) == 0:
-            return v
-    return None
+
+def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=200):
+    # NOTE: Newton method's complexity is larger than BFGS, but for small variables Newton method converges soon.
+    pollst_Q = Sequence(pollst, pollst[0].parent().change_ring(QQ))
+    vars_pol = pollst_Q[0].parent().gens()
+    jac = jacobian(pollst_Q, vars_pol)
+
+    if all([ele == 0 for ele in startpnt]):
+        # just for prepnt != pnt
+        prepnt = {vars_pol[i]: 1 for i in range(len(vars_pol))}
+    else:
+        prepnt = {vars_pol[i]: 0 for i in range(len(vars_pol))}
+    pnt = {vars_pol[i]: startpnt[i] for i in range(len(vars_pol))}
+
+    iternum = 0
+    while True:
+        if iternum >= maxiternum:
+            return None
+
+        evalpollst = [(pollst_Q[i].subs(pnt)) for i in range(len(pollst_Q))]
+        if all([int(ele) == 0 for ele in evalpollst]):
+            break
+        jac_eval = jac.subs(pnt)
+        evalpolvec = vector(QQ, len(evalpollst), evalpollst)
+        try:
+            pnt_diff_vec = jac_eval.solve_right(evalpolvec)
+        except:
+            return None
+
+        prepnt = {key:value for key,value in prepnt.items()}
+        pnt = {vars_pol[i]: round(QQ(pnt[vars_pol[i]] - pnt_diff_vec[i])) for i in range(len(pollst_Q))}
+
+        if all([prepnt[vars_pol[i]] == pnt[vars_pol[i]] for i in range(len(vars_pol))]):
+            return None
+        prepnt = {key:value for key,value in pnt.items()}
+        iternum += 1
+    return [int(pnt[vars_pol[i]]) for i in range(len(vars_pol))]
+
+
+def solve_system_jacobian(pollst, bounds):
+    vars_pol = pollst[0].parent().gens()
+    # not applicable to non-determined system
+    if len(vars_pol) > len(pollst):
+        return []
+    # pollst is not always algebraically independent,
+    # so just randomly choose wishing to obtain an algebraically independent set
+    for random_subset in tqdm(Combinations(pollst, k=len(vars_pol))): 
+        for signs in itertools.product([1, -1], repeat=len(vars_pol)):
+            startpnt = [signs[i] * bounds[i] for i in range(len(vars_pol))]
+            result = solve_root_jacobian_newton_internal(random_subset, startpnt)
+            # filter too much small solution
+            if result is not None:
+                if all([abs(ele) < 2**16 for ele in result]):
+                    continue
+                return [result]
 
 def solve_system_gb(H, f, timeout=5):
     vs = list(f.variables())
@@ -243,7 +279,7 @@ def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None):
         return None
 
     if algorithm == "jacobian":
-        return solve_system_jacobian(h, f, bounds)
+        return solve_system_jacobian(h, bounds)
     elif algorithm == "groebner":
         return solve_system_gb(h, f)
     else:
