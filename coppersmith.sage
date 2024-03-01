@@ -70,7 +70,7 @@ def univariate(f, X, beta=1.0, m=None):
     return [root for root in roots if N.gcd(ZZ(f(root))) >= N**beta]
 
 
-def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=200):
+def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=50):
     # NOTE: Newton method's complexity is larger than BFGS, but for small variables Newton method converges soon.
     pollst_Q = Sequence(pollst, pollst[0].parent().change_ring(QQ))
     vars_pol = pollst_Q[0].parent().gens()
