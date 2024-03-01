@@ -99,8 +99,7 @@ def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=200):
             return None
 
         prepnt = {key:value for key,value in prepnt.items()}
-        pnt = {vars_pol[i]: round(QQ(pnt[vars_pol[i]] - pnt_diff_vec[i])) for i in range(len(pollst_Q))}
-
+        pnt = {vars_pol[i]: numerical_approx(pnt[vars_pol[i]] - pnt_diff_vec[i]) for i in range(len(pollst_Q))}
         if all([prepnt[vars_pol[i]] == pnt[vars_pol[i]] for i in range(len(vars_pol))]):
             return None
         prepnt = {key:value for key,value in pnt.items()}
