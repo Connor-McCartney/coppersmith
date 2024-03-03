@@ -238,7 +238,10 @@ def univariate(f, X, beta=1.0, m=None):
         for j in range(g[i].degree()+1):
             B[i,j] = g[i][j]*X**j
 
-    B, _ = do_LLL_flatter(B)
+    try:
+        B, _ = do_LLL_flatter(B)
+    except:
+        B = B.LLL()
     f = sum([ZZ(B[0,i]//X**i)*x**i for i in range(B.ncols())])
     roots = set([f.base_ring()(r) for r,m in f.roots() if abs(r) <= X])
     return [root for root in roots if N.gcd(ZZ(f(root))) >= N**beta]
@@ -378,8 +381,10 @@ def multivariate_herrmann_may(f, bounds, m, t):
                 B[i, j] = v * Xmul[j]
 
     print("LLL...")
-    #B = B.LLL()
-    B, _ = do_LLL_flatter(B)
+    try:
+        B, _ = do_LLL_flatter(B)
+    except:
+        B = B.LLL()
     print("LLL done")
 
     h = []
@@ -432,8 +437,10 @@ def multivariate_shift_polynomials(f, bounds, m, d):
         B.rescale_col(i, factor)
 
     print("LLL...")
-    B = B.dense_matrix().LLL()
-    #B, _ = do_LLL_flatter(B)
+    try:
+        B, _ = do_LLL_flatter(B)
+    except:
+        B = B.dense_matrix().LLL()
     print("LLL done")
 
     B = B.change_ring(QQ)
