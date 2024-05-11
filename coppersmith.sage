@@ -429,7 +429,7 @@ def multivariate_shift_polynomials(f, bounds, m, d):
             g = mon//l^k * f_^k * N^(m-k)
             shifts.append(g)
 
-    B, monomials = shifts.coefficient_matrix()
+    B, monomials = shifts.coefficients_monomials()
     monomials = vector(monomials)
 
     factors = [monomial(*bounds) for monomial in monomials]
