@@ -17,6 +17,30 @@ from re import sub as re_sub
 from subprocess import run as subprocess_run
 
 
+
+def _xgcd_list(intlst: List[int]) -> Tuple[int, List[int]]:
+    """
+    extended gcd algorithm for a_0,...,a_k
+    input: [a_0, ..., a_k]
+    output: d_, [b_0, ..., b_k] s.t. gcd(a_0,...,a_k) = d_, sum(a_i*b_i for i) = d_
+    """
+
+    if len(intlst) == 1:
+        if intlst[0] >= 0:
+            return intlst[0], [1]
+        else:
+            return -intlst[0], [-1]
+
+    d, a, b = xgcd(intlst[0], intlst[1])
+
+    curgcd = d
+    curlst = [a, b]
+    for i in range(2, len(intlst)):
+        d, a, b = xgcd(curgcd, intlst[i])
+        curlst = list(map(lambda x: x*a, curlst)) + [b]
+        curgcd = d
+    return curgcd, curlst
+
 def _from_sagematrix_to_fplllmatrix(mat: matrix) -> str:
     return '[' + re_sub(
         r'\[ ',
