@@ -18,7 +18,7 @@ from subprocess import run as subprocess_run
 
 
 
-def _xgcd_list(intlst: List[int]) -> Tuple[int, List[int]]:
+def _xgcd_list(intlst):
     """
     extended gcd algorithm for a_0,...,a_k
     input: [a_0, ..., a_k]
