@@ -6,6 +6,8 @@ https://gist.github.com/hyunsikjeong/0c26e83bb37866f5c7c6b8918a854333
 https://github.com/josephsurin/lattice-based-cryptanalysis/blob/main/lbc_toolkit/problems/small_roots.sage
 https://github.com/kionactf/coppersmith
 https://eprint.iacr.org/2023/032.pdf
+https://eprint.iacr.org/2024/1577.pdf
+https://github.com/TheBlupper/coppersmith
 """
 
 from sage.rings.polynomial.multi_polynomial_sequence import PolynomialSequence
