@@ -8,6 +8,7 @@ https://github.com/kionactf/coppersmith
 https://eprint.iacr.org/2023/032.pdf
 https://eprint.iacr.org/2024/1577.pdf
 https://github.com/TheBlupper/coppersmith
+https://github.com/keeganryan/flatter
 """
 
 from sage.rings.polynomial.multi_polynomial_sequence import PolynomialSequence
