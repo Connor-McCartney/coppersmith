@@ -316,6 +316,39 @@ def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None, verbose
         print("invalid algorithm")
         return None
 
+
+def bivariate(f, bounds, implementation, m=1, t=1, d=None, verbose=False, slice_H=5):
+    assert f.nvariables() == 2
+    if implementation == "herrmann_may":
+        f, h = multivariate_herrmann_may(f, bounds, m, t, verbose=verbose)
+    elif implementation == "shift_polynomials":
+        f, h = multivariate_shift_polynomials(f, bounds, m, d, verbose=verbose)
+    else:
+        print("invalid implementation")
+        return None
+
+    if slice_H is not None:
+        h = h[:slice_H]
+    
+    # resultant solver
+    xx, yy = f.variables()
+    loop = itertools.combinations(h, r=2)
+    if verbose:
+        loop = tqdm(loop)
+    for f1, f2 in loop:
+        res = f1.resultant(f2, yy).univariate_polynomial()
+        if res == 0:
+            continue
+        rs = res.roots()
+        if rs:
+            x = rs[0][0]
+            if x != 0:
+                y = f1.subs({xx: x}).univariate_polynomial().roots()
+                if y:
+                    y = y[0][0]
+                    if y != 0:
+                        return (x, y)
+
 def recover_p_high(p_high, n, p_bits):
     p_high_bits = len(bin(p_high)) - 2
     PR.<x> = PolynomialRing(Zmod(n))
@@ -478,6 +511,8 @@ def demo_8():
     print("\ndemo 8: two chunks")
     test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5, verbose=True, max_newton_iters=10))
     test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=2, d=4, verbose=True, max_newton_iters=50))
+    test_prime(f, bivariate(f, bounds, implementation="herrmann_may", m=5))
+    test_prime(f, bivariate(f, bounds, implementation="shift_polynomials", m=2, d=4))
     
 def demo_9():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
@@ -487,7 +522,10 @@ def demo_9():
     print("\ndemo 9: two chunks")
     test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
     test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
-    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=4))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=5))
+    test_prime(f, bivariate(f, bounds, implementation="herrmann_may", m=2))
+    test_prime(f, bivariate(f, bounds, implementation="herrmann_may", m=2))
+    test_prime(f, bivariate(f, bounds, implementation="shift_polynomials", m=1, d=5))
 
 def demo_10():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
