@@ -16,204 +16,31 @@ from Crypto.Util.number import getPrime
 from tqdm import tqdm
 import cysignals
 import itertools
-from re import sub as re_sub
-from subprocess import run as subprocess_run
+from subprocess import check_output
+from re import findall
 
+def flatter(M):
+    z = "[[" + "]\n[".join(" ".join(map(str, row)) for row in M) + "]]"
+    ret = check_output(["flatter"], input=z.encode())
+    return matrix(M.nrows(), M.ncols(), map(int, findall(b"-?\\d+", ret)))
 
-
-def _xgcd_list(intlst):
-    """
-    extended gcd algorithm for a_0,...,a_k
-    input: [a_0, ..., a_k]
-    output: d_, [b_0, ..., b_k] s.t. gcd(a_0,...,a_k) = d_, sum(a_i*b_i for i) = d_
-    """
-
-    if len(intlst) == 1:
-        if intlst[0] >= 0:
-            return intlst[0], [1]
-        else:
-            return -intlst[0], [-1]
-
-    d, a, b = xgcd(intlst[0], intlst[1])
-
-    curgcd = d
-    curlst = [a, b]
-    for i in range(2, len(intlst)):
-        d, a, b = xgcd(curgcd, intlst[i])
-        curlst = list(map(lambda x: x*a, curlst)) + [b]
-        curgcd = d
-    return curgcd, curlst
-
-def _from_sagematrix_to_fplllmatrix(mat: matrix) -> str:
-    return '[' + re_sub(
-        r'\[ ',
-        r'[',
-        re_sub(r' +', r' ', str(mat))
-    ) + ']'
-
-
-def _fplllmatrix_to_sagematrix(matrixstr: str) -> matrix:
-    matlist = eval(matrixstr.replace(' ', ',').replace('\n', ','))
-    return matrix(ZZ, matlist)
-
-
-def _transformation_matrix(mat, lllmat, use_pari_matsol=False):
-    # pari.matker() does not assure smallest kernel in Z (seems not call hermite normal form)
-    # Sage kernel calls hermite normal form
-    #
-    # for computing ZZ transformation, use pari.matker, pari.matsolvemod
-    # assume first kerdim vectors for lllmat are zero vector
-    #
-    # anyway, transformation computation after LLL/BKZ is slow.
-    # instead, use builtin transformation computation on LLL/BKZ package
-
-    if use_pari_matsol:
-        mat_pari = pari.matrix(mat.nrows(), mat.ncols(), mat.list())
-        ker_pari_t = pari.matker(pari.mattranspose(mat_pari), 1)
-        kerdim = len(ker_pari_t)
-        if kerdim == 0:
-            # empty matrix
-            trans = matrix(ZZ, 0, mat.nrows())
-        else:
-            trans = matrix(ZZ, pari.mattranspose(ker_pari_t).Col().list())
-
-        mat_pari = pari.matrix(mat.nrows(), mat.ncols(), mat.list())
-        for i in range(kerdim, lllmat.nrows(), 1):
-            lllmat_pari = pari.vector(lllmat.ncols(), lllmat[i].list())
-            trans_pari_t = pari.matsolvemod(
-                pari.mattranspose(mat_pari), 0, pari.mattranspose(lllmat_pari)
-            )
-            transele = matrix(ZZ, trans_pari_t.mattranspose().Col().list())
-            trans = trans.stack(transele)
-    else:
-        trans = mat.kernel().matrix()
-        kerdim = trans.nrows()
-
-        for i in range(kerdim, lllmat.nrows(), 1):
-            transele = mat.solve_left(lllmat[i])
-            trans = trans.stack(transele)
-
-    return trans
-
-
-def do_LLL_flatter(
-        mat: matrix,
-        transformation: bool = False,
-        use_pari_kernel: bool = False, use_pari_matsol: bool = False
-    ):
-
-
-    if mat == zero_matrix(ZZ, mat.nrows(), mat.ncols()):
-        return mat, identity_matrix(ZZ, mat.nrows())
-
-    # sage has integer_kernel(), but somehow slow. instead using pari.matker
-    if use_pari_kernel:
-        mat_pari = pari.matrix(mat.nrows(), mat.ncols(), mat.list())
-        ker_pari_t = pari.matker(mat_pari.mattranspose(), 1)
-        ker = matrix(ZZ, ker_pari_t.mattranspose().Col().list())
-    else:
-        ker = mat.kernel().matrix()
-
-    kerdim = ker.nrows()
-    matrow = mat.nrows()
-    col = mat.ncols()
-    if kerdim == matrow: # full kernel
-        return zero_matrix(ZZ, matrow, col), ker
-    if kerdim == 0:
-        Hsub = mat
-        U = identity_matrix(ZZ, matrow)
-    else:
-        # heuristic construction for unimodular matrix which maps zero vectors on kernel
-        # searching unimodular matrix can be done by HNF
-        # (echeron_form(algorithm='pari') calls mathnf()),
-        # but it is slow and produces big elements
-        #
-        # instead, searching determinant of submatrix = 1/-1,
-        # then the determinant of whole unimodular matrix is det(submatrix)*(-1)^j
-        # assume kernel has good property for gcd (gcd of some row elements might be 1)
-        found_choice = False
-        ker_submat_rows = tuple(range(kerdim))
-        ker_submat_cols = []
-        pivot = matrow - 1
-        # search submatrix of kernel assuming last column vectors are triangulate
-        while len(ker_submat_cols) < kerdim:
-            if ker[ker_submat_rows, tuple([pivot])] != zero_matrix(ZZ, kerdim, 1):
-                ker_submat_cols.append(pivot)
-            pivot -= 1
-        ker_submat_cols = tuple(sorted(ker_submat_cols))
-        ker_last_det = int(ker[ker_submat_rows, ker_submat_cols].determinant())
-        if ker_last_det == 0:
-            raise ValueError("no unimodular matrix found (cause ker_last_det=0)")
-        for choice in range(pivot, -1, -1):
-            # gcd check
-            gcd_row = ker_last_det
-            for i in range(kerdim):
-                gcd_row = GCD(gcd_row, ker[i, choice])
-            if abs(gcd_row) != 1:
-                continue
-
-            # choice pivot: last columes for kernel are triangulated and small
-            kersubidxes = [choice] + list(ker_submat_cols)
-            detlst = [ker_last_det]
-            for i in range(1, kerdim+1, 1):
-                ker_submat_rows = tuple(range(kerdim))
-                ker_submat_cols = tuple(kersubidxes[:i] + kersubidxes[i+1:])
-                detlst.append(ker[ker_submat_rows, ker_submat_cols].determinant())
-                detlist_gcd, detlist_coef = _xgcd_list(detlst)
-                if detlist_gcd == 1:
-                    found_choice = True
-                    break
-            if not found_choice:
-                continue
-            detlist_coef = detlist_coef + [0] * ((kerdim + 1) - len(detlist_coef))
-            break
-        if not found_choice:
-            raise ValueError("no unimodular matrix found")
-        U_top_vec = [0 for _ in range(matrow)]
-        for i in range(kerdim+1):
-            U_top_vec[kersubidxes[i]] = (-1)**i * detlist_coef[i]
-        U_sub = matrix(ZZ, 1, matrow, U_top_vec)
-        not_kersubidxes = sorted(list(set(list(range(matrow))) - set(kersubidxes)))
-        for j in range(kerdim+1, matrow):
-            onevec = [0 for _ in range(matrow)]
-            onevec[not_kersubidxes[j-(kerdim+1)]] = 1
-            U_sub = U_sub.stack(vector(ZZ, matrow, onevec))
-        Hsub = U_sub * mat
-        U = ker.stack(U_sub)
-        #assert abs(U.determinant()) == 1
-
-    if Hsub.nrows() == 1:
-        lllmat = Hsub
-    else:
-        matstr = _from_sagematrix_to_fplllmatrix(Hsub)
-        result = subprocess_run(
-            'flatter',
-            input=matstr.encode(), capture_output=True
-        )
-        if result.returncode != 0:
-            print(result.stderr)
-            raise ValueError(f"LLL failed with return code {result.returncode}")
-        lllmat = _fplllmatrix_to_sagematrix(result.stdout.decode().strip())
-
-    if transformation:
-        trans = _transformation_matrix(Hsub, lllmat, use_pari_matsol=use_pari_matsol)
-    else:
-        trans = None
-
-    restrows = mat.nrows() - lllmat.nrows()
-    final_lllmat = zero_matrix(ZZ, restrows, lllmat.ncols()).stack(lllmat)
-
-    if transformation:
-        middle_trans = identity_matrix(ZZ, restrows).augment(zero_matrix(ZZ, restrows, trans.ncols())).stack(
-            zero_matrix(ZZ, trans.nrows(), restrows).augment(trans)
-        )
-        final_trans = middle_trans * U
-        #assert abs(final_trans.determinant()) == 1
-        #assert final_trans * mat == final_lllmat
-    else:
-        final_trans = None
-
-    return final_lllmat, final_trans
+def LLL(M, verbose=False):
+    try:
+        if verbose:
+            print('running flatter...')
+        r = flatter(M)
+        if verbose:
+            print('flatter complete')
+        return r
+    except Exception as ex:
+        print('flatter failed or not installed')
+        print(ex)
+        if verbose:
+            print('running fplll...')
+        r = M.dense_matrix().LLL()
+        if verbose:
+            print('fplll completed')
+        return r
 
 def generate_polynomial(N, _p):
     coefficients = []
@@ -246,7 +73,7 @@ def generate_polynomial(N, _p):
     f = int(_p.replace("?", "0"), 16) + sum([c * PR.objgens()[1][n] for n, c in enumerate(coefficients)])
     return f, bounds[::-1]
 
-def univariate(f, X, beta=1.0, m=None):
+def univariate(f, X, beta=1.0, m=None, verbose=False):
     N = f.parent().characteristic()
     delta = f.degree()
     if m is None:
@@ -265,16 +92,13 @@ def univariate(f, X, beta=1.0, m=None):
         for j in range(g[i].degree()+1):
             B[i,j] = g[i][j]*X**j
 
-    try:
-        B, _ = do_LLL_flatter(B)
-    except:
-        B = B.LLL()
+    B = LLL(B, verbose=verbose)
     f = sum([ZZ(B[0,i]//X**i)*x**i for i in range(B.ncols())])
     roots = set([f.base_ring()(r) for r,m in f.roots() if abs(r) <= X])
     return [root for root in roots if N.gcd(ZZ(f(root))) >= N**beta]
 
 
-def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=500):
+def solve_root_jacobian_newton_internal(pollst, startpnt, max_newton_iters=1000):
     # NOTE: Newton method's complexity is larger than BFGS, but for small variables Newton method converges soon.
     pollst_Q = Sequence(pollst, pollst[0].parent().change_ring(QQ))
     vars_pol = pollst_Q[0].parent().gens()
@@ -289,7 +113,7 @@ def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=500):
 
     iternum = 0
     while True:
-        if iternum >= maxiternum:
+        if iternum >= max_newton_iters:
             return None
 
         evalpollst = [(pollst_Q[i].subs(pnt)) for i in range(len(pollst_Q))]
@@ -311,27 +135,34 @@ def solve_root_jacobian_newton_internal(pollst, startpnt, maxiternum=500):
     return [int(pnt[vars_pol[i]]) for i in range(len(vars_pol))]
 
 
-def solve_system_jacobian(pollst, bounds):
+def solve_system_jacobian(pollst, bounds, max_newton_iters=1000, verbose=False):
     vars_pol = pollst[0].parent().gens()
     # not applicable to non-determined system
     if len(vars_pol) > len(pollst):
         return []
     # pollst is not always algebraically independent,
     # so just randomly choose wishing to obtain an algebraically independent set
-    for random_subset in tqdm(Combinations(pollst, k=len(vars_pol))): 
+    loop = Combinations(pollst, k=len(vars_pol))
+    if verbose:
+        loop = tqdm(loop)
+    for random_subset in loop: 
         for signs in itertools.product([1, -1], repeat=len(vars_pol)):
             startpnt = [signs[i] * bounds[i] for i in range(len(vars_pol))]
-            result = solve_root_jacobian_newton_internal(random_subset, startpnt)
+            result = solve_root_jacobian_newton_internal(random_subset, startpnt, max_newton_iters=max_newton_iters)
             # filter too much small solution
             if result is not None:
                 if all([abs(ele) < 2**16 for ele in result]):
                     continue
                 return [result]
 
-def solve_system_gb(H, f, timeout=5):
+def solve_system_gb(H, f, timeout=5, verbose=False):
     vs = list(f.variables())
     H_ = PolynomialSequence([], H[0].parent().change_ring(QQ))
-    for h in tqdm(H):
+
+    loop = H
+    if verbose:
+        loop = tqdm(loop)
+    for h in loop:
         H_.append(h)
         I = H_.ideal()
         roots = []
@@ -375,7 +206,7 @@ class IIter:
             break
         return ret
 
-def multivariate_herrmann_may(f, bounds, m, t):
+def multivariate_herrmann_may(f, bounds, m, t, verbose=False):
     n = f.nvariables()
     N = f.base_ring().cardinality()
     f /= f.coefficients().pop(0)  
@@ -407,12 +238,7 @@ def multivariate_herrmann_may(f, bounds, m, t):
                 v = g[i].monomial_coefficient(monomials[j])
                 B[i, j] = v * Xmul[j]
 
-    print("LLL...")
-    try:
-        B, _ = do_LLL_flatter(B)
-    except:
-        B = B.LLL()
-    print("LLL done")
+    B = LLL(B, verbose=verbose)
 
     h = []
     for i in range(B.nrows()):
@@ -428,7 +254,7 @@ def multivariate_herrmann_may(f, bounds, m, t):
    
     return f, h
 
-def multivariate_shift_polynomials(f, bounds, m, d):
+def multivariate_shift_polynomials(f, bounds, m, d, verbose=False):
     if d is None:
         d = f.degree()
 
@@ -463,12 +289,7 @@ def multivariate_shift_polynomials(f, bounds, m, d):
     for i, factor in enumerate(factors):
         B.rescale_col(i, factor)
 
-    print("LLL...")
-    try:
-        B, _ = do_LLL_flatter(B)
-    except:
-        B = B.dense_matrix().LLL()
-    print("LLL done")
+    B = LLL(B, verbose=verbose)
 
     B = B.change_ring(QQ)
     for i, factor in enumerate(factors):
@@ -478,19 +299,19 @@ def multivariate_shift_polynomials(f, bounds, m, d):
     H = PolynomialSequence([h for h in B*monomials if not h.is_zero()])
     return f, H
 
-def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None):
+def multivariate(f, bounds, implementation, algorithm, m=1, t=1, d=None, verbose=False, max_newton_iters=1000):
     if implementation == "herrmann_may":
-        f, h = multivariate_herrmann_may(f, bounds, m, t)
+        f, h = multivariate_herrmann_may(f, bounds, m, t, verbose=verbose)
     elif implementation == "shift_polynomials":
-        f, h = multivariate_shift_polynomials(f, bounds, m, d)
+        f, h = multivariate_shift_polynomials(f, bounds, m, d, verbose=verbose)
     else:
         print("invalid implementation")
         return None
 
     if algorithm == "jacobian":
-        return solve_system_jacobian(h, bounds)
+        return solve_system_jacobian(h, bounds, max_newton_iters=max_newton_iters, verbose=verbose)
     elif algorithm == "groebner":
-        return solve_system_gb(h, f)
+        return solve_system_gb(h, f, verbose=verbose)
     else:
         print("invalid algorithm")
         return None
@@ -518,6 +339,18 @@ def recover_p_low(p_low, n, p_bits):
     if is_prime(p):
         return p
     return None
+
+def test_prime(f, roots):
+    if roots is None:
+        print('FAIL')
+        return
+    p = int(f(*roots))
+
+    N = f.base_ring().cardinality()
+    if 1<p<N and N%p == 0:
+        print('PASS')
+    else:
+        print('FAIL')
 
 def demo_1():
     p = getPrime(512)
@@ -583,7 +416,7 @@ def demo_4():
             for xi in range(-upper_bound + upper_bound//8, upper_bound, upper_bound//4):
                 P.<x> = PolynomialRing(Zmod(n))
                 f = _dp*e + x - xi
-                x = f.small_roots(X=upper_bound, beta=beta)
+                x = univariate(f, X=upper_bound, beta=beta, m=3, verbose=True)
                 if x == []:
                     continue
                 kp = int(f(x[0]))
@@ -610,10 +443,10 @@ def demo_5():
     _p = "?????????????????????????????????????????????????????????????????????????????????????1895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257"
     f, bounds = generate_polynomial(n, _p)
     print("\ndemo 5: one chunk")
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
 
 def demo_6():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
@@ -621,10 +454,10 @@ def demo_6():
     _p = "a2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c7017009749?????????????????????????????????????????????????????????????????????????????????????"
     f, bounds = generate_polynomial(n, _p)
     print("\ndemo 6: one chunk")
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
 
 def demo_7():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
@@ -632,10 +465,10 @@ def demo_7():
     _p = "a2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0?????????????????????????????????????????????????????????????????????????????????fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257"
     f, bounds = generate_polynomial(n, _p)
     print("\ndemo 7: one chunk")
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="groebner", m=1, d=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=2))
 
 def demo_8():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
@@ -643,8 +476,8 @@ def demo_8():
     _p = "a2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd????????????????????????????????????86ee047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f6?????????????????????????????"
     f, bounds = generate_polynomial(n, _p)
     print("\ndemo 8: two chunks")
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=2, d=4))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5, verbose=True, max_newton_iters=10))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=2, d=4, verbose=True, max_newton_iters=50))
     
 def demo_9():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
@@ -652,9 +485,9 @@ def demo_9():
     _p = "a2f51e080856a2737bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c4????????????d1f51890f06ba0b9ce75b73d4fe86ee047ba422cfbca474e2c70170097498fd9db8ce21????????????2a48569ff794066fc4d53f67a5583b5f605ee12192af5e690178e79d61d257"
     f, bounds = generate_polynomial(n, _p)
     print("\ndemo 9: two chunks")
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
-    print(multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=4))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="groebner", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
+    test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=4))
 
 def demo_10():
     n = 0x7de3efa8914a53819b254c1fbd8c899e48484df13ee28ebcaa8ae55d979b683ab38a462a716bf54ff5982ab1152269ba920ffdc5e037ebda4685ad734cab9048a851f811624b01d102e1f1623f226101ffdedd78a3e90779f41911ba5d29e7b643e9934ad391d5b68ad3c71d4999d197e73d7f1320073627928d12190fcc9207427d497f4bf1802592e53302d47c8a9eb45f6488515bb6d14baf223dc73d5b11d75f3d483857797ac406ab062e8ceb17767da6c360ffdd304f058518f80374a9ee806675fb89e5399693d3a199e2786efe3b19f8b7f3804df332a1c036f3e4025ef0b9bed9e3963513ad3e8092f4f71ce91e5149cffe1a585ffd95599fce75f5
@@ -662,7 +495,8 @@ def demo_10():
     _p = "????????????????7bb2357dabcb6b5dba7d03cf0ecf0cf378b47666227cb3a0da901b6de823d8be53c401895f0a4ba24c47bd243039d6bd1f51890f06ba0????????????????e047ba422cfbca474e2c70170097498fd9db8ce21f5c1ce1ec1f22a48569ff794066fc4d53f67a5583b5f605ee12192af5e????????????????"
     f, bounds = generate_polynomial(n, _p)
     print("\ndemo 10: three chunks")
-    print(multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5))
+    test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=5, verbose=True, max_newton_iters=10))
+
 
 def main():
     demo_1()
