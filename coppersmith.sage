@@ -524,7 +524,6 @@ def demo_9():
     test_prime(f, multivariate(f, bounds, implementation="herrmann_may", algorithm="jacobian", m=2))
     test_prime(f, multivariate(f, bounds, implementation="shift_polynomials", algorithm="jacobian", m=1, d=5))
     test_prime(f, bivariate(f, bounds, implementation="herrmann_may", m=2))
-    test_prime(f, bivariate(f, bounds, implementation="herrmann_may", m=2))
     test_prime(f, bivariate(f, bounds, implementation="shift_polynomials", m=1, d=5))
 
 def demo_10():
