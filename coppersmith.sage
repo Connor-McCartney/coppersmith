@@ -210,7 +210,8 @@ class IIter:
 def multivariate_herrmann_may(f, bounds, m, t, verbose=False):
     n = f.nvariables()
     N = f.base_ring().cardinality()
-    f /= f.coefficients().pop(0)  
+    #f /= f.coefficients().pop(0)  
+    f = (f * pow(f.lc(), -1, N))
     f = f.change_ring(ZZ)
     x = f.parent().objgens()[1]
 
