@@ -263,10 +263,7 @@ def multivariate_shift_polynomials(f, bounds, m, d, verbose=False):
     R = f.base_ring()
     N = R.cardinality()
     #f_ = (f // f.lc()).change_ring(ZZ)
-    try:
-        f_ = (f * pow(f.lc(), -1, N)).change_ring(ZZ)
-    except:
-        f_ = f.change_ring(ZZ)
+    f_ = (f * pow(f.lc(), -1, N)).change_ring(ZZ)
     f = f.change_ring(ZZ)
     l = f.lm()
 
