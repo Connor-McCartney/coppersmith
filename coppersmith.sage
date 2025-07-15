@@ -10,6 +10,7 @@ https://eprint.iacr.org/2024/1577.pdf
 https://github.com/TheBlupper/coppersmith
 https://github.com/keeganryan/flatter
 https://github.com/keeganryan/cuso
+https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.cits.ruhr-uni-bochum.de/imperia/md/content/may/paper/intro_to_coppersmiths_method.pdf&ved=2ahUKEwjU1uqxq76OAxXVr1YBHXJqH0wQFnoECDgQAQ&usg=AOvVaw2xN9m7NgisRkaV_ppLjCAS
 """
 
 from sage.rings.polynomial.multi_polynomial_sequence import PolynomialSequence
