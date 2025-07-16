@@ -10,9 +10,7 @@ https://eprint.iacr.org/2024/1577.pdf
 https://github.com/TheBlupper/coppersmith
 https://github.com/keeganryan/flatter
 https://github.com/keeganryan/cuso
-Lattice-based Integer Factorization –
-An Introduction to Coppersmith’s Method
-Alexander May
+Lattice-based Integer Factorization – An Introduction to Coppersmith’s Method - Alexander May
 """
 
 from sage.rings.polynomial.multi_polynomial_sequence import PolynomialSequence
