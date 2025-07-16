@@ -417,9 +417,9 @@ def demo_3():
     def recover_d_low(d_low, n, e, p_bits):
         t = len(bin(d_low)) - 2
         for k in tqdm(range(1, e)):
-            x = var('x')
-            for r in solve_mod([x*e*d_low == x + k*(n*x - x**2 - n + x)], 2**t):
-                p_low = int(r[0])
+            PR.<x> = PolynomialRing(Zmod(2**t))
+            f = x + k*(n*x - x**2 - n + x) - x*e*d_low
+            for p_low in [ZZ(r_) for r_ in f.roots(multiplicities=False)]:
                 try:
                     p = recover_p_low(p_low, n, p_bits)
                     if p is not None and is_prime(p):
